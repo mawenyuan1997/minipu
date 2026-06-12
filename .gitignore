@@ -6,5 +6,6 @@ __pycache__/
 *.so
 build/
 dist/
+generated/
 venv/
 .venv/

@@ -78,3 +78,21 @@ def register() -> None:
 
 def is_registered() -> bool:
     return _REGISTERED
+
+
+def _extension():
+    return importlib.import_module("minipu_backend._C")
+
+
+def codegen_dir() -> str:
+    """Return the directory where the demo backend writes generated code."""
+
+    return _extension().codegen_dir()
+
+
+def emit_demo_codegen() -> str:
+    """Emit toy CUDA kernels for add, mul, and relu."""
+
+    ext = _extension()
+    ext.emit_demo_codegen()
+    return ext.codegen_dir()
