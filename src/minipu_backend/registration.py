@@ -42,11 +42,11 @@ class _MiniPUDeviceModule:
 
 
 def _require_privateuse1_api() -> None:
-    missing = [
-        name
-        for name in ("rename_privateuse1_backend", "_register_device_module")
-        if not hasattr(torch, name)
-    ]
+    missing = []
+    if _rename_privateuse1_backend_fn() is None:
+        missing.append("rename_privateuse1_backend")
+    if not hasattr(torch, "_register_device_module"):
+        missing.append("_register_device_module")
     if not hasattr(torch.utils, "generate_methods_for_privateuse1_backend"):
         missing.append("torch.utils.generate_methods_for_privateuse1_backend")
     if missing:
@@ -54,6 +54,20 @@ def _require_privateuse1_api() -> None:
             "This demo requires a modern PyTorch build with PrivateUse1 helpers. "
             f"Missing: {', '.join(missing)}"
         )
+
+
+def _rename_privateuse1_backend_fn():
+    rename = getattr(torch, "rename_privateuse1_backend", None)
+    if rename is None:
+        rename = getattr(torch.utils, "rename_privateuse1_backend", None)
+    return rename
+
+
+def _rename_privateuse1_backend(name: str) -> None:
+    rename = _rename_privateuse1_backend_fn()
+    if rename is None:
+        raise RuntimeError("rename_privateuse1_backend is not available")
+    rename(name)
 
 
 def register() -> None:
@@ -66,7 +80,7 @@ def register() -> None:
     _require_privateuse1_api()
     importlib.import_module("minipu_backend._C")
 
-    torch.rename_privateuse1_backend(BACKEND_NAME)
+    _rename_privateuse1_backend(BACKEND_NAME)
     torch._register_device_module(BACKEND_NAME, _MiniPUDeviceModule)
     torch.utils.generate_methods_for_privateuse1_backend(
         for_tensor=True,
