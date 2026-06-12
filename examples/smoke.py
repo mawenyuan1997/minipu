@@ -14,13 +14,8 @@ def main() -> None:
     y = torch.tensor([4.0, 5.0, 6.0])
 
     added = torch.ops.minipu.add(x, y)
-    multiplied = torch.ops.minipu.mul(x, y)
-    activated = torch.ops.minipu.relu(x)
 
     print(f"add: {added.tolist()}")
-    print(f"mul: {multiplied.tolist()}")
-    print(f"relu: {activated.tolist()}")
-    print("generated: add.cu, mul.cu, relu.cu")
 
 
 if __name__ == "__main__":

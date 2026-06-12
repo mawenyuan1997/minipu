@@ -1,62 +1,57 @@
 # MiniPU PrivateUse1 Backend
 
-`minipu_backend` is a minimal PyTorch custom backend skeleton that uses the
-reserved `PrivateUse1` dispatch key. It does not implement any custom kernels.
-Instead, it registers a boxed backend fallback that sends unsupported operators
-through PyTorch's CPU fallback path.
+MiniPU demonstrates PyTorch `PrivateUse1` registration and a runnable custom-operator codegen script. The custom operators accept CPU tensors, generate CUDA code, and use ATen CPU operators to compute results. Separate `PrivateUse1` ATen handlers are registered, but we can't have real MiniPU tensors because device allocation and copy support are not implemented.
 
-This is meant to be a small starting point for experimenting with out-of-tree
-backends, not a real accelerator runtime.
-
-## What It Contains
-
-- A C++ extension that registers:
-  - `PrivateUse1` boxed fallback -> `at::native::cpu_fallback`
-  - `AutocastPrivateUse1` fallthrough
-- A Python registration helper that:
-  - imports the C++ extension
-  - renames `PrivateUse1` to `minipu`
-  - registers a tiny `torch.minipu` device module
-  - generates `Tensor.minipu()`, `Tensor.is_minipu`, and related helpers
-- A smoke example and pytest coverage.
-
-## Requirements
-
-- Python 3.9+
-- PyTorch 2.1+ recommended
-- A working C++ compiler compatible with your PyTorch install
-
-The default Python in this workspace has PyTorch 1.2.0, which predates the
-modern `PrivateUse1` APIs. The tests therefore skip on that interpreter.
-
-## Install
-
-```bash
-python -m pip install -e .
+## Install and run
 ```
-
-## Run The Example
-
-```bash
+python -m pip install -e .
 python examples/smoke.py
 ```
 
-Expected output on a modern PyTorch install:
+## Registering The Backend
 
-```text
-backend: minipu
-extension registered: True
-torch.minipu.is_available(): True
+`examples/smoke.py` demostrates how it works. The code
+
+```python
+import minipu_backend
+
+minipu_backend.register()
+```
+ does four things in `register()` of `src/minipu_backend/registration.py`:
+
+1. Verifies that the installed PyTorch has the required `PrivateUse1` helpers.
+2. Imports `minipu_backend._C`, which loads the C++ dispatcher registrations.
+3. Renames `PrivateUse1` to `minipu` with `torch.rename_privateuse1_backend`.
+4. Registers a small `torch.minipu` module and asks PyTorch to generate helper
+   methods such as `Tensor.minipu()` and `Tensor.is_minipu`.
+
+After registration, Python code can refer to the backend by the name `minipu`
+instead of the internal dispatch key name `PrivateUse1`.
+
+## PyTorch Runtime Flow
+
+```python
+x = torch.tensor([-2.0, 1.0, 3.0])
+y = torch.tensor([4.0, 5.0, 6.0])
 ```
 
-If your PyTorch build supports creating `PrivateUse1` tensors with CPU fallback
-alone, the example will also run a tiny tensor operation. Many real backends
-still need at least allocator, storage, copy, generator, and device guard pieces
-before tensors can live on the renamed device.
+PyTorch creates two normal CPU tensor instead of minipu tensor because in this project, we didn't implement functionalities like allocating memory on device and copying the tensor to device. Creating them with `device="minipu"` would fail
 
-## Useful References
+```python
+added = torch.ops.minipu.add(x, y)
+```
 
-- PyTorch PrivateUse1 tutorial:
-  https://docs.pytorch.org/tutorials/advanced/privateuseone.html
-- PyTorch C++ extension docs:
-  https://pytorch.org/tutorials/advanced/cpp_extension.html
+This line calls the custom PyTorch operator named `minipu::add`. Since x and y are CPU tensors, PyTorch selects its registered CPU implementation `minipu_custom_add`. That function generates `add.cu` and computes the result using PyTorch’s CPU operator `at::add`.
+
+
+## CUDA Code Generation
+
+When an operator is called, PyTorch’s dispatcher identifies operator as `minipu::add` and tensor key as `CPU`. It finds
+
+```cpp
+TORCH_LIBRARY_IMPL(minipu, CPU, m) {
+  m.impl("add", TORCH_FN(minipu_custom_add));
+}
+```
+
+from `src/minipu_backend/csrc/backend.cpp` and then it calls `minipu_custom_add(x, y)` which generates the CUDA code and computes the result on CPU
