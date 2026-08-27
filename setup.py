@@ -11,6 +11,7 @@ setup(
                 "csrc/allocator.cpp",
                 "csrc/runtime.cpp",
                 "csrc/kernels.cu",
+                "csrc/factory.cpp",
             ],
             extra_compile_args={"cxx": ["-O3"], "nvcc": ["-O3"]},
         )

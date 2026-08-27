@@ -11,7 +11,6 @@ namespace {
 
 void cuda_deleter(void* ptr) {
     if (ptr != nullptr) {
-        // deleter 不应抛异常。
         (void)cudaFree(ptr);
     }
 }

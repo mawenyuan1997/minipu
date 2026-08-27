@@ -36,7 +36,6 @@ public:
     void uncheckedSetDevice(
         c10::Device device
     ) const noexcept override {
-        // 该函数是 noexcept，因此不能在这里抛出异常。
         (void)cudaSetDevice(device.index());
     }
 
@@ -48,7 +47,6 @@ public:
     }
 
     c10::Stream exchangeStream(c10::Stream stream) const override {
-        // 当前 demo 还没有实现 PrivateUse1 stream 状态管理。
         return stream;
     }
 
@@ -57,7 +55,6 @@ public:
         const cudaError_t status = cudaGetDeviceCount(&count);
 
         if (status != cudaSuccess) {
-            // 接口要求 noexcept；发生驱动错误时返回 0。
             return 0;
         }
 
